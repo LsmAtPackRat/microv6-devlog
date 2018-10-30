@@ -86,7 +86,7 @@ qemu-system-i386 -serial mon:stdio -hdb fs.img xv6.img -smp 2 -m 512 -nographic
 - 基于微内核架构，使用消息在各个OS service/Application之间通信；
 - 能够针对性能需求弹性伸缩各个OS service/Application所占用的资源；
 
-的新的kernel——microv6（代码仓库：https://github.com/LsmAtPackRat/microv6）。
+的新的kernel——microv6（代码仓库：https://github.com/LsmAtPackRat/microv6 ）。
 
 
 
