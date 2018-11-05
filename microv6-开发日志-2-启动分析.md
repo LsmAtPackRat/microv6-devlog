@@ -33,3 +33,43 @@ wiki BIOS interrupt：https://en.wikipedia.org/wiki/BIOS_interrupt_call
 又一篇解释7c00：https://www.cnblogs.com/kuwoyidai/archive/2011/06/23/2105617.html
 
 Oracle assembly language reference manual：https://docs.oracle.com/cd/E26502_01/html/E28388/eoiyg.html
+
+
+
+ld链接脚本的官方文档解释：http://ftp.gnu.org/old-gnu/Manuals/ld-2.9.1/html_mono/ld.html#SEC21
+
+一篇讲解AT关键字的博客：https://blog.csdn.net/redredbird/article/details/5986035
+
+我现在理解的VMA是section被加载器加载时的虚拟地址。LMA则是section在可执行文件中的地址。如果不用AT指定的话，默认LMA=VMA，这样的话，section之间不够紧凑。可以使用AT关键字来指定section在输出目标文件中的位置，比如：
+
+```
+.data 0x8000 : AT(ADDR(.text) + SIZEOF(.text)) 
+```
+
+这种写法是的.data紧接着.text存放在elf中。可以起到压缩elf文件的作用。
+
+XV6的用法是，将.text指定AT在XV6.img的Kernel部分的0X100000处。
+
+```shell
+lsm@lsm-VirtualBox:~/microv6$ readelf -l kernel
+
+Elf file type is EXEC (Executable file)
+Entry point 0x10000c
+There are 2 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x001000 0x80100000 0x00100000 0x0a516 0x154a8 RWE 0x1000
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RWE 0x10
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .text .rodata .stab .stabstr .data .bss 
+   01    
+```
+
+ 上述可以看出，kernel的需要load的segment只有一个，它位于elf文件的offset=0x001000处，也就是前面跳过了一个page的大小（ELF Header）。这个segment会被load到的虚拟地址是virtAddr，而加载到的物理地址是0x100000，它是由bootloader的C部分，来load的。
+
+上面还可以看出，program header从ELF文件的offset=52开始定义。struct elfhdr的size正好是52个字节，所以说，program headers是紧随着elf header放置的。
+
+《程序员的自我修养》的page-165提到segment的物理装载地址，就是section的LMA。
