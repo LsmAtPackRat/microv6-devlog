@@ -1,19 +1,61 @@
 ### 本文要点
 
-本文分析xv6的启动流程。主要分为以下几个步骤：
+本文分析xv6的启动流程。
+
+xv6的启动流程，主要分为以下几个步骤：
 
 1. BIOS从磁盘加载boot sector到内存，并运行其中的boot loader；
 2. boot loader从磁盘上加载kernel到内存，由entry进入kernel；
 3. 建立entrypgdir页表，并开启分页，kernel进入main函数；
 4. 内核初始化；
 5. 建立第一个用户进程，重点在于构造其kernel stack；
-6. 启动当前CPU上的scheduler（一个无限循环），开启本CPU的进程调度。此scheduler会调度第一个用户进程执行initcode.S中的start函数（这步实现依靠的是上一步kernel stack的构造）；
-7. 第一个用户进程的start函数调用syscall：exec(init, argv)，演变成init进程；
+6. 启动boot processor上的scheduler（一个无限循环），开启boot processor上的进程调度，完成boot processor的设置。
+7. 第一个用户进程会被某个CPU的scheduler调度，执行initcode.S中的start函数（这步实现依靠的是上一步kernel stack的构造）。第一个用户进程的start函数调用syscall：exec(init, argv)，演变成init进程；
 8. init进程fork并exec出shell（sh进程），而init进程则调用wait()等待shell进程结束。
 
 至此，kernel启动的所有步骤执行完毕。
 
 接着对每一个步骤进行细致的代码分析。
+
+
+
+### BIOS加载boot sector
+
+
+
+
+
+### boot loader加载kernel
+
+
+
+### entry开启分页
+
+
+
+### 内核初始化
+
+逐个启动其他non-boot (AP) processors。
+
+
+
+
+
+### 构造第一个用户进程
+
+
+
+### 开启boot processor的进程调度
+
+
+
+### 第一个用户进程演变为init进程
+
+
+
+### 启动shell进程
+
+
 
 
 
