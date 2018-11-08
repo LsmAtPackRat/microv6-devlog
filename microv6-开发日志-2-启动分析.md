@@ -15,6 +15,8 @@ xv6的启动流程，主要分为以下几个步骤：
 
 至此，kernel启动的所有步骤执行完毕。接下来对上述每一个步骤，进行细致的代码分析。
 
+
+
 ------
 
 ### BIOS加载boot sector
@@ -27,15 +29,26 @@ xv6.img分为两个部分：
 
 
 
+#### BIOS功能简介
+
+BIOS是存储在ROM中的一个非常小的操作系统。它的任务如下：
+
+1. 初始化硬件；
+2. 从磁盘加载boot loader到RAM中，并将控制权转交给它。
+
+我们现在只关心加载boot loader的细节。BIOS会加载boot sector（sector 0）到RAM的0x7C00处（这个一个惯例，不是xv6特有的，原因可见：[阮一峰解释0x7C00](http://www.ruanyifeng.com/blog/2015/09/0x7c00.html)），并将CPU的%ip设置为0x7C00以跳转到这个地址执行。
+
+
+
 #### bootblock的构建
 
-是bootasm.S和bootmain.c两个文件链接而成的目标文件：
+查看Makefile，bootblock是bootasm.S和bootmain.c两个文件编译，再链接在一起的目标文件：
 
 ```shell
 bootblock: bootasm.S bootmain.c
 $(CC) $(CFLAGS) -fno-pic -O -nostdinc -I. -c bootmain.c
 $(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c bootasm.S
-# ld -Ttext ADDRESS (Set address of .text section) ? what's the meaning?
+# ld -Ttext ADDRESS (Set address of .text section) 
 # ld -e/--entry ADDRESS (Set start address)
 $(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 -o bootblock.o bootasm.o bootmain.o 
 $(OBJDUMP) -S bootblock.o > bootblock.asm
@@ -44,22 +57,70 @@ $(OBJCOPY) -S -O binary -j .text bootblock.o bootblock
 ./sign.pl bootblock
 ```
 
+解释一下其中的关键参数：
+
+- LD那行“-e start”指定了start作为入口函数，“-Ttext 0x7C00”指定了.text section的地址为0x7C00。
+- OBJCOPY那行的"-j .text"的作用是仅将bootblock.o的代码段拷贝到bootblock二进制输出文件中。
+- sign.pl是一个脚本，专门用于将输入文件的末尾用0填充，并且最后两个字节设置为\x55\xAA。
+
+以上参数生成的bootblock如下图：
+
+（一张展示图）
 
 
-#### BIOS功能简介
 
-BIOS是存储在ROM中的一个非常小的操作系统。它的任务如下：
+由上图可知，当bootblock被加载到RAM的0x7C00处时，实际上就是.text的起始物理地址是0x7C00（因为bootblock二进制中只有bootblock.o的.text）。而由于链接时指定了.text section的地址（VM）为0x7C00，所以所有的symbols的地址重定位都是以0x7C00为基准的：
+```shell
+lsm@lsm-VirtualBox:~/microv6$ objdump -h bootblock.o
 
-1. 初始化硬件；
-2. 加载boot loader，并将控制权转交给它。
+bootblock.o:     file format elf32-i386
 
-我们现在只关心加载boot loader的细节。BIOS会加载boot sector到RAM的0x7C00处（这个一个惯例，不是xv6特有的，原因可见：[阮一峰解释0x7C00](http://www.ruanyifeng.com/blog/2015/09/0x7c00.html)），并将CPU的%ip设置为0x7C00以跳转到这个地址执行。
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         000001bc  00007c00  00007c00  00000074  2**2
+                  CONTENTS, ALLOC, LOAD, CODE
+  1 .eh_frame     000000b8  00007dbc  00007dbc  00000230  2**2
+                  CONTENTS, ALLOC, LOAD, READONLY, DATA
+  2 .comment      00000034  00000000  00000000  000002e8  2**0
+                  CONTENTS, READONLY
+  3 .debug_aranges 00000040  00000000  00000000  00000320  2**3
+                  CONTENTS, READONLY, DEBUGGING
+  4 .debug_info   0000053b  00000000  00000000  00000360  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  5 .debug_abbrev 000001cd  00000000  00000000  0000089b  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  6 .debug_line   0000010b  00000000  00000000  00000a68  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  7 .debug_str    000001cb  00000000  00000000  00000b73  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_loc    00000264  00000000  00000000  00000d3e  2**0
+                  CONTENTS, READONLY, DEBUGGING
+```
+
+由于boot loader并没有开启分页功能，所以linear address会直接用作physical address进行内存访问。
 
 
+
+------
 
 ### boot loader加载kernel
 
-kernel的开头4096个字节存放的是ELF header，紧接着存放的是kernel的每一个segment的program header table。
+boot loader的逻辑通过bootasm.S和bootmain.c两个文件实现，它们的主要任务为：
+
+- bootasm.S：实模式切换到保护模式；
+- bootmain.c：加载kernel。
+
+
+
+#### 实模式切换到保护模式
+
+
+
+#### 加载kernel
+
+kernel存放于磁盘的sector 1开始处。kernel的开头4096个字节存放的是kernel ELF header，紧接着存放的是描述segment的program header table。
+
+
 
 
 
