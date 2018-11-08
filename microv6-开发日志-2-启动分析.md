@@ -13,19 +13,53 @@ xv6的启动流程，主要分为以下几个步骤：
 7. 第一个用户进程会被某个CPU的scheduler调度，执行initcode.S中的start函数（这步实现依靠的是上一步kernel stack的构造）。第一个用户进程的start函数调用syscall：exec(init, argv)，演变成init进程；
 8. init进程fork并exec出shell（sh进程），而init进程则调用wait()等待shell进程结束。
 
-至此，kernel启动的所有步骤执行完毕。
+至此，kernel启动的所有步骤执行完毕。接下来对上述每一个步骤，进行细致的代码分析。
 
-接着对每一个步骤进行细致的代码分析。
-
-
+------
 
 ### BIOS加载boot sector
 
+xv6.img分为两个部分：
 
+（图片展示bootblock+kernel）
+
+其中bootblock占开头的512字节，它被存放磁盘的boot sector中。紧接着的剩余部分就是kernel。
+
+
+
+#### bootblock的构建
+
+是bootasm.S和bootmain.c两个文件链接而成的目标文件：
+
+```shell
+bootblock: bootasm.S bootmain.c
+$(CC) $(CFLAGS) -fno-pic -O -nostdinc -I. -c bootmain.c
+$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c bootasm.S
+# ld -Ttext ADDRESS (Set address of .text section) ? what's the meaning?
+# ld -e/--entry ADDRESS (Set start address)
+$(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 -o bootblock.o bootasm.o bootmain.o 
+$(OBJDUMP) -S bootblock.o > bootblock.asm
+# '-j .text' means only copy .text section from bootblock.o to bootblock
+$(OBJCOPY) -S -O binary -j .text bootblock.o bootblock
+./sign.pl bootblock
+```
+
+
+
+#### BIOS功能简介
+
+BIOS是存储在ROM中的一个非常小的操作系统。它的任务如下：
+
+1. 初始化硬件；
+2. 加载boot loader，并将控制权转交给它。
+
+我们现在只关心加载boot loader的细节。BIOS会加载boot sector到RAM的0x7C00处（这个一个惯例，不是xv6特有的，原因可见：[阮一峰解释0x7C00](http://www.ruanyifeng.com/blog/2015/09/0x7c00.html)），并将CPU的%ip设置为0x7C00以跳转到这个地址执行。
 
 
 
 ### boot loader加载kernel
+
+kernel的开头4096个字节存放的是ELF header，紧接着存放的是kernel的每一个segment的program header table。
 
 
 
@@ -73,6 +107,8 @@ objdump -h kernel
 
 引导扇区的最后两个字节（结束标志）必须是55AAH，否则bios不认为0扇区是mbr。mbr不属于任何一个OS，而是公用的引导性质。
 
+------
+
 
 
 ### 参考资料
@@ -85,7 +121,7 @@ gnu make：http://www.gnu.org/software/make/manual/make.html#Catalogue-of-Rules�
 
 一个简短的Makefile启动部分的分析：https://www.cnblogs.com/hygblog/p/9343068.html
 
-阮一峰解释0x7C00：http://www.ruanyifeng.com/blog/2015/09/0x7c00.html
+[阮一峰解释0x7C00](http://www.ruanyifeng.com/blog/2015/09/0x7c00.html)
 
 wiki BIOS interrupt：https://en.wikipedia.org/wiki/BIOS_interrupt_call
 
